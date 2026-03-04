@@ -662,6 +662,18 @@ if "institutions" not in st.session_state:
     st.session_state.institutions = []
 if "generated_label" not in st.session_state:
     st.session_state.generated_label = ""
+if "pending_generate" not in st.session_state:
+    st.session_state.pending_generate = None
+if "pending_clear" not in st.session_state:
+    st.session_state.pending_clear = False
+
+# Handle deferred state updates BEFORE widgets render
+if st.session_state.pending_generate is not None:
+    st.session_state.variants_editor = st.session_state.pending_generate
+    st.session_state.pending_generate = None
+if st.session_state.pending_clear:
+    st.session_state.variants_editor = ""
+    st.session_state.pending_clear = False
 
 # --- Input ---
 st.markdown('<div class="section-label">ADD AN INSTITUTION</div>', unsafe_allow_html=True)
@@ -680,7 +692,7 @@ inst_label = st.text_input(
 if st.button("Generate variants"):
     if inst_label.strip():
         variants = generate_institution_variants(inst_label.strip())
-        st.session_state.variants_editor = "\n".join(variants)
+        st.session_state.pending_generate = "\n".join(variants)
         st.session_state.generated_label = inst_label.strip()
         st.rerun()
     else:
@@ -698,7 +710,7 @@ if st.button("\u2795 Add institution"):
     variants = [v.strip() for v in variants_text.strip().splitlines() if v.strip()]
     if label and variants:
         st.session_state.institutions.append({"label": label, "variants": variants})
-        st.session_state.variants_editor = ""
+        st.session_state.pending_clear = True
         st.session_state.generated_label = ""
         st.rerun()
     elif not label:
