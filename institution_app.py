@@ -660,16 +660,17 @@ with st.sidebar:
 # --- Session state ---
 if "institutions" not in st.session_state:
     st.session_state.institutions = []
-if "pending_variants" not in st.session_state:
-    st.session_state.pending_variants = None
+if "generated_variants_text" not in st.session_state:
+    st.session_state.generated_variants_text = ""
+if "generated_label" not in st.session_state:
+    st.session_state.generated_label = ""
 
 # --- Input ---
-st.markdown('<div class="section-label">ADD INSTITUTIONS</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-label">ADD AN INSTITUTION</div>', unsafe_allow_html=True)
 
 st.caption(
-    "Enter an institution name and the app will auto-generate common affiliation variants. "
-    "You can review, edit, add, or remove variants before adding the institution to your list. "
-    "Use \"Add another institution\" to compare multiple institutions."
+    "Enter an institution name below and click **Generate variants** to auto-populate common "
+    "affiliation name variants. Then review the list, edit as needed, and click **Add institution**."
 )
 
 inst_label = st.text_input(
@@ -678,62 +679,38 @@ inst_label = st.text_input(
     key="inst_label",
 )
 
-if st.button("\U0001f50d Generate affiliation variants"):
+if st.button("Generate variants"):
     if inst_label.strip():
         variants = generate_institution_variants(inst_label.strip())
-        st.session_state.pending_variants = {
-            "label": inst_label.strip(),
-            "variants": variants,
-        }
+        st.session_state.generated_variants_text = "\n".join(variants)
+        st.session_state.generated_label = inst_label.strip()
         st.rerun()
     else:
         st.warning("Please enter an institution name.")
 
-# --- Show pending variants for review ---
-if st.session_state.pending_variants is not None:
-    pending = st.session_state.pending_variants
-    st.markdown(f'<div class="section-label">REVIEW VARIANTS FOR: {pending["label"]}</div>', unsafe_allow_html=True)
-    st.caption("Check or uncheck variants to include in the search. You can also add custom variants below.")
+variants_text = st.text_area(
+    "Affiliation variants (one per line \u2014 edit, add, or remove as needed)",
+    value=st.session_state.generated_variants_text,
+    height=200,
+    key="variants_editor",
+    placeholder="Click 'Generate variants' above, or type affiliation names manually \u2014 one per line.",
+)
 
-    # Editable variant list with checkboxes
-    selected = []
-    for i, v in enumerate(pending["variants"]):
-        if st.checkbox(v, value=True, key=f"var_cb_{i}"):
-            selected.append(v)
-
-    # Add custom variants
-    custom_variants = st.text_input(
-        "Add custom variants (comma-separated)",
-        placeholder="e.g. My Hospital Name, Another Alias",
-        key="custom_variants",
-    )
-
-    col_add, col_cancel = st.columns([1, 1])
-    with col_add:
-        if st.button("\u2705 Add institution with selected variants", use_container_width=True):
-            # Merge selected + custom
-            all_variants = list(selected)
-            if custom_variants:
-                for cv in custom_variants.split(","):
-                    cv = cv.strip()
-                    if cv and cv not in all_variants:
-                        all_variants.append(cv)
-            if all_variants:
-                st.session_state.institutions.append({
-                    "label": pending["label"],
-                    "variants": all_variants,
-                })
-                st.session_state.pending_variants = None
-                st.rerun()
-            else:
-                st.warning("Select at least one variant.")
-    with col_cancel:
-        if st.button("\u274c Cancel", use_container_width=True):
-            st.session_state.pending_variants = None
-            st.rerun()
+if st.button("\u2795 Add institution"):
+    label = st.session_state.generated_label or inst_label.strip()
+    variants = [v.strip() for v in variants_text.strip().splitlines() if v.strip()]
+    if label and variants:
+        st.session_state.institutions.append({"label": label, "variants": variants})
+        st.session_state.generated_variants_text = ""
+        st.session_state.generated_label = ""
+        st.rerun()
+    elif not label:
+        st.warning("Please enter an institution name.")
+    else:
+        st.warning("Please add at least one affiliation variant.")
 
 # --- Bulk entry ---
-st.markdown("")
+st.markdown("---")
 st.caption("**Bulk entry:** Paste multiple institutions \u2014 one per line. Format: `Label; Variant1, Variant2, ...`")
 st.caption("If you only provide a label (no semicolon), variants will be auto-generated.")
 bulk_text = st.text_area(
