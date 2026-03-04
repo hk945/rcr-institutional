@@ -660,8 +660,6 @@ with st.sidebar:
 # --- Session state ---
 if "institutions" not in st.session_state:
     st.session_state.institutions = []
-if "generated_variants_text" not in st.session_state:
-    st.session_state.generated_variants_text = ""
 if "generated_label" not in st.session_state:
     st.session_state.generated_label = ""
 
@@ -682,7 +680,7 @@ inst_label = st.text_input(
 if st.button("Generate variants"):
     if inst_label.strip():
         variants = generate_institution_variants(inst_label.strip())
-        st.session_state.generated_variants_text = "\n".join(variants)
+        st.session_state.variants_editor = "\n".join(variants)
         st.session_state.generated_label = inst_label.strip()
         st.rerun()
     else:
@@ -690,7 +688,6 @@ if st.button("Generate variants"):
 
 variants_text = st.text_area(
     "Affiliation variants (one per line \u2014 edit, add, or remove as needed)",
-    value=st.session_state.generated_variants_text,
     height=200,
     key="variants_editor",
     placeholder="Click 'Generate variants' above, or type affiliation names manually \u2014 one per line.",
@@ -701,7 +698,7 @@ if st.button("\u2795 Add institution"):
     variants = [v.strip() for v in variants_text.strip().splitlines() if v.strip()]
     if label and variants:
         st.session_state.institutions.append({"label": label, "variants": variants})
-        st.session_state.generated_variants_text = ""
+        st.session_state.variants_editor = ""
         st.session_state.generated_label = ""
         st.rerun()
     elif not label:
