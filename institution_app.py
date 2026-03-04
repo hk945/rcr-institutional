@@ -38,6 +38,246 @@ ANALYSIS_YEARS = [CURRENT_YEAR - 2, CURRENT_YEAR - 1]  # last 2 full calendar ye
 
 
 # ---------------------------------------------------------------------------
+# Institution name variant generator
+# ---------------------------------------------------------------------------
+_STATE_ABBREVS = {
+    "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR",
+    "California": "CA", "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE",
+    "Florida": "FL", "Georgia": "GA", "Hawaii": "HI", "Idaho": "ID",
+    "Illinois": "IL", "Indiana": "IN", "Iowa": "IA", "Kansas": "KS",
+    "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
+    "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS",
+    "Missouri": "MO", "Montana": "MT", "Nebraska": "NE", "Nevada": "NV",
+    "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY",
+    "North Carolina": "NC", "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK",
+    "Oregon": "OR", "Pennsylvania": "PA", "Rhode Island": "RI",
+    "South Carolina": "SC", "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX",
+    "Utah": "UT", "Vermont": "VT", "Virginia": "VA", "Washington": "WA",
+    "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY",
+    "District of Columbia": "DC",
+}
+
+_SKIP_WORDS = {"of", "the", "and", "at", "in", "for", "on", "&"}
+
+_KNOWN_UC_ABBREVS = {
+    "San Francisco": "UCSF", "Los Angeles": "UCLA", "San Diego": "UCSD",
+    "Santa Barbara": "UCSB", "Santa Cruz": "UCSC", "Davis": "UCD",
+    "Irvine": "UCI", "Riverside": "UCR", "Berkeley": "UCB", "Merced": "UCM",
+}
+
+# Well-known institution aliases not easily derived by rules
+_KNOWN_ALIASES = {
+    "university of pennsylvania": ["UPenn", "Penn Medicine", "Penn Med",
+                                    "Perelman School of Medicine"],
+    "university of michigan": ["Michigan Medicine", "U-M", "UMich"],
+    "yale university": ["Yale-New Haven Hospital", "Yale New Haven",
+                        "Yale Medicine"],
+    "stanford university": ["Stanford Health Care", "Stanford Medicine"],
+    "columbia university": ["Columbia University Irving Medical Center",
+                            "NewYork-Presbyterian", "Columbia Irving"],
+    "harvard university": ["Harvard Medical School", "Harvard T.H. Chan",
+                           "Harvard T H Chan", "Beth Israel Deaconess",
+                           "Brigham and Women", "Massachusetts General",
+                           "Boston Children's Hospital", "Dana-Farber",
+                           "McLean Hospital"],
+    "johns hopkins university": ["Johns Hopkins Hospital",
+                                  "Johns Hopkins Medicine",
+                                  "Johns Hopkins Bloomberg"],
+    "duke university": ["Duke Health", "Duke University Medical Center",
+                        "Duke University Hospital"],
+    "university of pittsburgh": ["UPMC", "Pitt"],
+    "cornell university": ["Weill Cornell", "NewYork-Presbyterian/Weill Cornell"],
+    "university of washington": ["UW Medicine", "UW Medical Center",
+                                  "Harborview Medical Center"],
+    "mayo clinic": ["Mayo Clinic Rochester", "Mayo Clinic Arizona",
+                    "Mayo Clinic Florida", "Mayo Foundation"],
+    "massachusetts general hospital": ["Mass General", "Mass General Brigham",
+                                        "MGH"],
+    "mount sinai": ["Icahn School of Medicine at Mount Sinai",
+                    "Icahn School of Medicine", "Mount Sinai Hospital",
+                    "Mount Sinai Health System"],
+    "university of california, los angeles": ["Ronald Reagan UCLA Medical Center"],
+    "university of california, san diego": ["UC San Diego Health"],
+    "university of california, san francisco": ["UCSF Benioff", "San Francisco General Hospital",
+                                                  "Zuckerberg San Francisco General"],
+    "emory university": ["Emory Healthcare", "Emory School of Medicine",
+                         "Grady Memorial Hospital"],
+    "university of chicago": ["UChicago Medicine", "UChicago"],
+    "northwestern university": ["Northwestern Medicine",
+                                 "Northwestern Memorial Hospital",
+                                 "Feinberg School of Medicine"],
+    "vanderbilt university": ["Vanderbilt University Medical Center", "VUMC",
+                               "Vanderbilt Health"],
+    "new york university": ["NYU Langone", "NYU Grossman School of Medicine",
+                             "NYU Grossman"],
+    "university of texas southwestern": ["UT Southwestern", "UTSW",
+                                          "Parkland Memorial Hospital"],
+    "university of colorado": ["UCHealth", "UC Denver",
+                                "University of Colorado Anschutz"],
+    "baylor college of medicine": ["Baylor College", "Texas Children's Hospital"],
+    "washington university in st. louis": ["Washington University in St Louis",
+                                            "WashU", "Barnes-Jewish Hospital",
+                                            "BJC HealthCare"],
+    "university of virginia": ["UVA Health", "UVA"],
+    "university of iowa": ["UI Health Care", "University of Iowa Hospitals"],
+    "university of minnesota": ["M Health Fairview", "UMN"],
+    "university of wisconsin": ["UW Health", "UW-Madison"],
+    "oregon health & science university": ["OHSU"],
+    "oregon health and science university": ["OHSU"],
+    "university of alabama at birmingham": ["UAB", "UAB Medicine"],
+    "university of rochester": ["UR Medicine", "Strong Memorial Hospital"],
+    "university of florida": ["UF Health", "UF College of Medicine"],
+    "university of maryland": ["University of Maryland Medical Center", "UMMC"],
+    "case western reserve university": ["CWRU", "University Hospitals Cleveland",
+                                         "MetroHealth"],
+    "brown university": ["Warren Alpert Medical School", "Lifespan",
+                         "Rhode Island Hospital", "Brown Medicine"],
+    "university of cincinnati": ["UC Health", "UC College of Medicine"],
+    "tufts university": ["Tufts Medical Center", "Tufts School of Medicine"],
+    "georgetown university": ["MedStar Georgetown", "Georgetown University Medical Center"],
+    "boston university": ["Boston Medical Center", "BU School of Medicine",
+                          "Boston University Chobanian"],
+    "thomas jefferson university": ["Jefferson Health", "Sidney Kimmel Medical College"],
+    "rush university": ["Rush University Medical Center", "Rush Medical College"],
+    "tulane university": ["Tulane School of Medicine", "Tulane Medical Center"],
+    "university of south florida": ["USF Health", "USF Morsani College of Medicine"],
+    "university of utah": ["U of U Health", "University of Utah Health",
+                            "Huntsman Cancer Institute"],
+    "wake forest university": ["Atrium Health Wake Forest Baptist",
+                                "Wake Forest School of Medicine",
+                                "Wake Forest Baptist"],
+    "medical university of south carolina": ["MUSC", "MUSC Health"],
+    "university of nebraska": ["UNMC", "Nebraska Medicine",
+                                "University of Nebraska Medical Center"],
+    "university of kansas": ["KU Medical Center", "University of Kansas Health System"],
+    "university of kentucky": ["UK HealthCare", "UK College of Medicine"],
+    "university of arkansas": ["UAMS", "University of Arkansas for Medical Sciences"],
+    "ohio state university": ["Ohio State Wexner Medical Center", "OSU"],
+    "pennsylvania state university": ["Penn State Health", "Penn State Hershey",
+                                       "Penn State College of Medicine"],
+    "michigan state university": ["MSU College of Human Medicine",
+                                   "Sparrow Hospital"],
+    "indiana university": ["IU School of Medicine", "IU Health"],
+    "university of tennessee": ["UT Health Science Center", "UTHSC"],
+    "university of texas": ["UT Health", "Dell Medical School"],
+}
+
+
+def generate_institution_variants(name):
+    """Generate common affiliation variants for an institution name."""
+    name = name.strip()
+    if not name:
+        return []
+
+    variants = set()
+    variants.add(name)
+
+    # Add known aliases
+    name_lower = name.lower().rstrip(".")
+    for key, aliases in _KNOWN_ALIASES.items():
+        if key in name_lower or name_lower in key:
+            for alias in aliases:
+                variants.add(alias)
+
+    # Remove commas for a no-comma variant
+    no_comma = name.replace(",", "")
+    if no_comma != name:
+        variants.add(no_comma)
+
+    # --- "University of [State/Place], [City]" pattern ---
+    uc_match = re.match(
+        r"University of ([A-Za-z ]+?)(?:,\s*(.+))?$", name, re.IGNORECASE
+    )
+    if uc_match:
+        state_or_place = uc_match.group(1).strip()
+        city = (uc_match.group(2) or "").strip()
+
+        if city:
+            variants.add(f"University of {state_or_place} {city}")
+            if city in _KNOWN_UC_ABBREVS:
+                abbrev = _KNOWN_UC_ABBREVS[city]
+                variants.add(abbrev)
+                variants.add(f"{abbrev} Medical Center")
+                variants.add(f"{abbrev} Health")
+                variants.add(f"{abbrev} School of Medicine")
+            else:
+                state_abbrev = "".join(
+                    w[0].upper() for w in state_or_place.split() if w.lower() not in _SKIP_WORDS
+                )
+                city_abbrev = "".join(
+                    w[0].upper() for w in city.split() if w.lower() not in _SKIP_WORDS
+                )
+                uc_short = f"U{state_abbrev}"
+                variants.add(uc_short)
+                variants.add(f"{uc_short}{city_abbrev}")
+                variants.add(f"{uc_short} {city}")
+            if state_or_place.lower() == "california":
+                variants.add(f"UC {city}")
+        else:
+            state_abbrev = "".join(
+                w[0].upper() for w in state_or_place.split() if w.lower() not in _SKIP_WORDS
+            )
+            variants.add(f"U{state_abbrev}")
+            if state_or_place in _STATE_ABBREVS:
+                st_code = _STATE_ABBREVS[state_or_place]
+                variants.add(f"U{st_code}")
+
+        if city:
+            variants.add(f"University of {state_or_place} {city} School of Medicine")
+            variants.add(f"University of {state_or_place}, {city} School of Medicine")
+        else:
+            variants.add(f"University of {state_or_place} School of Medicine")
+
+    # --- "[Place] University" pattern ---
+    place_univ_match = re.match(r"(.+?)\s+University$", name, re.IGNORECASE)
+    if place_univ_match and not uc_match:
+        place = place_univ_match.group(1).strip()
+        variants.add(place)
+        variants.add(f"{place} University School of Medicine")
+        variants.add(f"{place} School of Medicine")
+        variants.add(f"{place} Medical School")
+        variants.add(f"{place} Medical Center")
+        variants.add(f"{place} University Medical Center")
+        words = [w for w in place.split() if w.lower() not in _SKIP_WORDS]
+        if len(words) > 1:
+            abbrev = "".join(w[0].upper() for w in words)
+            variants.add(abbrev)
+
+    # --- "[Name] School of Medicine" pattern ---
+    som_match = re.match(r"(.+?)\s+School of Medicine$", name, re.IGNORECASE)
+    if som_match:
+        base = som_match.group(1).strip()
+        variants.add(base)
+        variants.add(f"{base} College of Medicine")
+        variants.add(f"{base} Medical School")
+        variants.add(f"{base} Medical Center")
+
+    # --- "[Name] Medical Center" / "[Name] Hospital" pattern ---
+    mc_match = re.match(r"(.+?)\s+(Medical Center|Hospital|Health System|Health Sciences?)$", name, re.IGNORECASE)
+    if mc_match:
+        base = mc_match.group(1).strip()
+        suffix = mc_match.group(2).strip()
+        variants.add(base)
+        if "Medical Center" in suffix:
+            variants.add(f"{base} Hospital")
+            variants.add(f"{base} Health")
+        elif "Hospital" in suffix:
+            variants.add(f"{base} Medical Center")
+            variants.add(f"{base} Health")
+
+    # --- Generic abbreviation ---
+    words = name.replace(",", " ").split()
+    significant = [w for w in words if w[0:1].isupper() and w.lower() not in _SKIP_WORDS]
+    if len(significant) >= 2:
+        abbrev = "".join(w[0].upper() for w in significant)
+        if 2 <= len(abbrev) <= 6:
+            variants.add(abbrev)
+
+    variants.discard("")
+    return sorted(variants)
+
+
+# ---------------------------------------------------------------------------
 # PubMed search with 10k workaround
 # ---------------------------------------------------------------------------
 def get_ncbi_delay(api_key):
@@ -45,7 +285,6 @@ def get_ncbi_delay(api_key):
 
 
 def esearch_count(query, email, api_key=None):
-    """Return total count of results for a query without fetching IDs."""
     params = {
         "db": "pubmed", "term": query, "rettype": "count",
         "retmode": "json", "email": email,
@@ -58,7 +297,6 @@ def esearch_count(query, email, api_key=None):
 
 
 def esearch_ids(query, email, api_key=None, retmax=10000):
-    """Return up to retmax PMIDs for a query."""
     params = {
         "db": "pubmed", "term": query, "retmax": retmax,
         "retmode": "json", "email": email,
@@ -72,7 +310,6 @@ def esearch_ids(query, email, api_key=None, retmax=10000):
 
 
 def build_affiliation_query(institution_names, year):
-    """Build a PubMed query for institution affiliations in a given year."""
     affil_parts = []
     for name in institution_names:
         name = name.strip()
@@ -84,7 +321,6 @@ def build_affiliation_query(institution_names, year):
 
 
 def build_monthly_query(institution_names, year, month):
-    """Build a PubMed query for a specific month."""
     affil_parts = []
     for name in institution_names:
         name = name.strip()
@@ -101,32 +337,22 @@ def build_monthly_query(institution_names, year, month):
 
 
 def search_institution_pmids(institution_names, year, email, api_key=None, status_fn=None):
-    """
-    Get all PMIDs for an institution in a given year.
-    If > 9,500 results, splits into monthly queries to stay under 10k limit.
-    """
     query = build_affiliation_query(institution_names, year)
     count = esearch_count(query, email, api_key)
-
     if status_fn:
         status_fn(f"  {year}: {count:,} publications found")
-
     if count == 0:
         return []
-
     if count <= 9500:
         return esearch_ids(query, email, api_key, retmax=10000)
-
-    # Too many results - split by month
     all_pmids = set()
     for month in range(1, 13):
         monthly_query = build_monthly_query(institution_names, year, month)
         monthly_count = esearch_count(monthly_query, email, api_key)
         if monthly_count == 0:
             continue
-        if monthly_count > 9500:
-            if status_fn:
-                status_fn(f"  {year}/{month:02d}: {monthly_count:,} papers (exceeds 10k limit, results may be incomplete)")
+        if monthly_count > 9500 and status_fn:
+            status_fn(f"  {year}/{month:02d}: {monthly_count:,} papers (exceeds 10k limit, results may be incomplete)")
         ids = esearch_ids(monthly_query, email, api_key, retmax=10000)
         all_pmids.update(ids)
         if status_fn:
@@ -138,7 +364,6 @@ def search_institution_pmids(institution_names, year, email, api_key=None, statu
 # iCite
 # ---------------------------------------------------------------------------
 def fetch_icite(pmids, status_fn=None):
-    """Fetch iCite data for a list of PMIDs. Returns dict keyed by PMID string."""
     result = {}
     total = len(pmids)
     for start in range(0, total, ICITE_BATCH):
@@ -157,7 +382,7 @@ def fetch_icite(pmids, status_fn=None):
             for pub in data.get("data", []):
                 result[str(pub.get("pmid", ""))] = pub
         except Exception:
-            pass  # skip failed batches
+            pass
         if status_fn and (start + ICITE_BATCH) % 1000 < ICITE_BATCH:
             status_fn(f"  iCite: processed {min(start + ICITE_BATCH, total):,} / {total:,} PMIDs")
     return result
@@ -167,7 +392,6 @@ def fetch_icite(pmids, status_fn=None):
 # Metrics calculation
 # ---------------------------------------------------------------------------
 def compute_institution_metrics(icite_data, year=None):
-    """Compute institution-level metrics from iCite data."""
     rcrs = []
     percentiles = []
     citation_counts = []
@@ -196,7 +420,7 @@ def compute_institution_metrics(icite_data, year=None):
 
     total_pubs = len(icite_data) if year is None else sum(1 for p in icite_data.values() if p.get("year") == year)
 
-    metrics = {
+    return {
         "total_publications": total_pubs,
         "pubs_with_rcr": len(rcrs),
         "rcr_sum": round(sum(rcrs), 2) if rcrs else 0,
@@ -210,7 +434,6 @@ def compute_institution_metrics(icite_data, year=None):
         "clinical_articles": clinical_count,
         "provisional_rcr_count": provisional_count,
     }
-    return metrics
 
 
 # ---------------------------------------------------------------------------
@@ -228,19 +451,17 @@ ALT_FILL = PatternFill("solid", fgColor="D6EAF8")
 
 def write_institution_xlsx(institution_label, icite_data, metrics_by_year, combined_metrics):
     wb = Workbook()
-
-    # --- Summary sheet ---
     ws_sum = wb.active
     ws_sum.title = "Summary"
 
     ws_sum.merge_cells("A1:F1")
-    ws_sum["A1"] = f"{institution_label} — Publication Metrics"
+    ws_sum["A1"] = f"{institution_label} \u2014 Publication Metrics"
     ws_sum["A1"].font = Font(name="Arial", bold=True, size=14, color="1B4F72")
     ws_sum["A1"].alignment = Alignment(horizontal="left", vertical="center")
     ws_sum.row_dimensions[1].height = 30
 
     ws_sum.merge_cells("A2:F2")
-    ws_sum["A2"] = f"Analysis period: {ANALYSIS_YEARS[0]}–{ANALYSIS_YEARS[-1]}"
+    ws_sum["A2"] = f"Analysis period: {ANALYSIS_YEARS[0]}\u2013{ANALYSIS_YEARS[-1]}"
     ws_sum["A2"].font = Font(name="Arial", italic=True, size=10, color="666666")
 
     headers = ["Metric"] + [str(y) for y in ANALYSIS_YEARS] + ["Combined"]
@@ -277,7 +498,6 @@ def write_institution_xlsx(institution_label, icite_data, metrics_by_year, combi
         cell.font = Font(name="Arial", bold=True, size=10)
         cell.border = THIN_BORDER
         cell.fill = fill
-
         for j, year in enumerate(ANALYSIS_YEARS):
             val = metrics_by_year.get(year, {}).get(key, "N/A")
             cell = ws_sum.cell(row=row, column=2 + j, value=val)
@@ -285,7 +505,6 @@ def write_institution_xlsx(institution_label, icite_data, metrics_by_year, combi
             cell.alignment = Alignment(horizontal="center")
             cell.border = THIN_BORDER
             cell.fill = fill
-
         val = combined_metrics.get(key, "N/A")
         cell = ws_sum.cell(row=row, column=2 + len(ANALYSIS_YEARS), value=val)
         cell.font = Font(name="Arial", bold=True, size=10)
@@ -293,9 +512,7 @@ def write_institution_xlsx(institution_label, icite_data, metrics_by_year, combi
         cell.border = THIN_BORDER
         cell.fill = fill
 
-    # --- Publications sheet ---
     ws_pubs = wb.create_sheet("All Publications")
-
     pub_headers = ["PMID", "Year", "Title", "Journal", "DOI", "RCR", "NIH Percentile", "Citations", "Research", "Clinical"]
     pub_widths = [12, 8, 55, 25, 25, 10, 16, 12, 10, 10]
 
@@ -349,10 +566,7 @@ def write_institution_xlsx(institution_label, icite_data, metrics_by_year, combi
 # Pipeline
 # ---------------------------------------------------------------------------
 def run_institution_pipeline(institution_names, email, api_key, progress_bar, status_text):
-    """Run the full pipeline for one set of institution names."""
-    all_pmids = {}  # year -> list of pmid strings
-
-    # Step 1: Search PubMed for each year
+    all_pmids = {}
     for i, year in enumerate(ANALYSIS_YEARS):
         status_text.text(f"Searching PubMed for {year} publications...")
         pmids = search_institution_pmids(
@@ -362,20 +576,15 @@ def run_institution_pipeline(institution_names, email, api_key, progress_bar, st
         all_pmids[year] = pmids
         progress_bar.progress((i + 1) / (len(ANALYSIS_YEARS) + 2))
 
-    # Step 2: Deduplicate and fetch iCite
     unique_pmids = list(set(p for year_pmids in all_pmids.values() for p in year_pmids))
     status_text.text(f"Fetching iCite data for {len(unique_pmids):,} unique publications...")
 
     if not unique_pmids:
         return None, None, None, {}
 
-    icite_data = fetch_icite(
-        unique_pmids,
-        status_fn=lambda msg: status_text.text(msg),
-    )
+    icite_data = fetch_icite(unique_pmids, status_fn=lambda msg: status_text.text(msg))
     progress_bar.progress((len(ANALYSIS_YEARS) + 1) / (len(ANALYSIS_YEARS) + 2))
 
-    # Step 3: Compute metrics
     status_text.text("Computing metrics...")
     metrics_by_year = {}
     for year in ANALYSIS_YEARS:
@@ -384,7 +593,6 @@ def run_institution_pipeline(institution_names, email, api_key, progress_bar, st
 
     combined_icite = {pmid: pub for pmid, pub in icite_data.items()}
     combined_metrics = compute_institution_metrics(combined_icite)
-
     progress_bar.progress(1.0)
 
     return metrics_by_year, combined_metrics, icite_data, all_pmids
@@ -398,52 +606,20 @@ st.set_page_config(page_title="Institution RCR Analyzer", page_icon="\U0001f3db"
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Nunito+Sans:wght@400;500;600;700&display=swap');
-
     .stApp { background-color: #fafbfc; }
-
-    .main-header {
-        font-family: 'Libre Baskerville', Georgia, serif;
-        font-size: 2.4rem; font-weight: 700; color: #1B4F72;
-        margin-bottom: 0.2rem; letter-spacing: -0.01em;
-    }
-    .sub-header {
-        font-family: 'Nunito Sans', sans-serif;
-        font-size: 1.05rem; color: #5D6D7E; margin-bottom: 0.3rem; font-weight: 400;
-    }
-    .detail-text {
-        font-family: 'Nunito Sans', sans-serif;
-        font-size: 0.88rem; color: #85929E; margin-bottom: 2rem; line-height: 1.5;
-    }
-    .section-label {
-        font-family: 'Nunito Sans', sans-serif;
-        font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.08em; color: #85929E; margin-bottom: 0.5rem;
-    }
-    .stat-card {
-        background: white; border: 1px solid #D5DBDB; border-radius: 12px;
-        padding: 1.25rem 1.5rem; text-align: center;
-    }
-    .stat-value {
-        font-family: 'Libre Baskerville', Georgia, serif;
-        font-size: 1.8rem; font-weight: 700; color: #1B4F72;
-    }
-    .stat-label {
-        font-family: 'Nunito Sans', sans-serif;
-        font-size: 0.78rem; color: #85929E; text-transform: uppercase;
-        letter-spacing: 0.05em; margin-top: 0.25rem;
-    }
+    .main-header { font-family: 'Libre Baskerville', Georgia, serif; font-size: 2.4rem; font-weight: 700; color: #1B4F72; margin-bottom: 0.2rem; letter-spacing: -0.01em; }
+    .sub-header { font-family: 'Nunito Sans', sans-serif; font-size: 1.05rem; color: #5D6D7E; margin-bottom: 0.3rem; font-weight: 400; }
+    .detail-text { font-family: 'Nunito Sans', sans-serif; font-size: 0.88rem; color: #85929E; margin-bottom: 2rem; line-height: 1.5; }
+    .section-label { font-family: 'Nunito Sans', sans-serif; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #85929E; margin-bottom: 0.5rem; }
+    .stat-card { background: white; border: 1px solid #D5DBDB; border-radius: 12px; padding: 1.25rem 1.5rem; text-align: center; }
+    .stat-value { font-family: 'Libre Baskerville', Georgia, serif; font-size: 1.8rem; font-weight: 700; color: #1B4F72; }
+    .stat-label { font-family: 'Nunito Sans', sans-serif; font-size: 0.78rem; color: #85929E; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.25rem; }
     div[data-testid="stDataFrame"] { border: 1px solid #D5DBDB; border-radius: 8px; }
-
-    button[data-baseweb="tab"] {
-        font-family: 'Nunito Sans', sans-serif !important;
-        font-size: 1rem !important; font-weight: 500 !important;
-        color: #5D6D7E !important; padding: 0.75rem 1.25rem !important;
-    }
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #1B4F72 !important; font-weight: 700 !important;
-    }
+    button[data-baseweb="tab"] { font-family: 'Nunito Sans', sans-serif !important; font-size: 1rem !important; font-weight: 500 !important; color: #5D6D7E !important; padding: 0.75rem 1.25rem !important; }
+    button[data-baseweb="tab"][aria-selected="true"] { color: #1B4F72 !important; font-weight: 700 !important; }
     button[data-baseweb="tab"]:hover { color: #1B4F72 !important; }
     div[data-baseweb="tab-list"] { gap: 0.5rem; }
+    .variant-box { background: #EBF5FB; border: 1px solid #AED6F1; border-radius: 8px; padding: 1rem; margin: 0.5rem 0 1rem 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -484,39 +660,85 @@ with st.sidebar:
 # --- Session state ---
 if "institutions" not in st.session_state:
     st.session_state.institutions = []
+if "pending_variants" not in st.session_state:
+    st.session_state.pending_variants = None
 
 # --- Input ---
 st.markdown('<div class="section-label">ADD INSTITUTIONS</div>', unsafe_allow_html=True)
 
 st.caption(
-    "Enter institution names exactly as they appear in PubMed author affiliations. "
-    "Multiple name variants for the **same institution** should be entered together (they will be ORed). "
-    "Use \"Add institution\" to add separate institutions for comparison."
+    "Enter an institution name and the app will auto-generate common affiliation variants. "
+    "You can review, edit, add, or remove variants before adding the institution to your list. "
+    "Use \"Add another institution\" to compare multiple institutions."
 )
 
-col_name, col_variants = st.columns([1, 2])
-with col_name:
-    inst_label = st.text_input("Institution label", placeholder="e.g. Utopia Medical Center", key="inst_label")
-with col_variants:
-    inst_variants = st.text_input(
-        "Affiliation name(s) \u2014 comma-separated variants",
-        placeholder="e.g. Utopia Medical Center, Utopia School of Medicine, Utopia Hospital",
-        key="inst_variants",
-    )
+inst_label = st.text_input(
+    "Institution name",
+    placeholder="e.g. University of California, San Francisco",
+    key="inst_label",
+)
 
-if st.button("\u2795 Add institution"):
-    if inst_label.strip() and inst_variants.strip():
-        variants = [v.strip() for v in inst_variants.split(",") if v.strip()]
-        st.session_state.institutions.append({"label": inst_label.strip(), "variants": variants})
+if st.button("\U0001f50d Generate affiliation variants"):
+    if inst_label.strip():
+        variants = generate_institution_variants(inst_label.strip())
+        st.session_state.pending_variants = {
+            "label": inst_label.strip(),
+            "variants": variants,
+        }
         st.rerun()
     else:
-        st.warning("Please enter both a label and at least one affiliation name.")
+        st.warning("Please enter an institution name.")
 
+# --- Show pending variants for review ---
+if st.session_state.pending_variants is not None:
+    pending = st.session_state.pending_variants
+    st.markdown(f'<div class="section-label">REVIEW VARIANTS FOR: {pending["label"]}</div>', unsafe_allow_html=True)
+    st.caption("Check or uncheck variants to include in the search. You can also add custom variants below.")
+
+    # Editable variant list with checkboxes
+    selected = []
+    for i, v in enumerate(pending["variants"]):
+        if st.checkbox(v, value=True, key=f"var_cb_{i}"):
+            selected.append(v)
+
+    # Add custom variants
+    custom_variants = st.text_input(
+        "Add custom variants (comma-separated)",
+        placeholder="e.g. My Hospital Name, Another Alias",
+        key="custom_variants",
+    )
+
+    col_add, col_cancel = st.columns([1, 1])
+    with col_add:
+        if st.button("\u2705 Add institution with selected variants", use_container_width=True):
+            # Merge selected + custom
+            all_variants = list(selected)
+            if custom_variants:
+                for cv in custom_variants.split(","):
+                    cv = cv.strip()
+                    if cv and cv not in all_variants:
+                        all_variants.append(cv)
+            if all_variants:
+                st.session_state.institutions.append({
+                    "label": pending["label"],
+                    "variants": all_variants,
+                })
+                st.session_state.pending_variants = None
+                st.rerun()
+            else:
+                st.warning("Select at least one variant.")
+    with col_cancel:
+        if st.button("\u274c Cancel", use_container_width=True):
+            st.session_state.pending_variants = None
+            st.rerun()
+
+# --- Bulk entry ---
 st.markdown("")
-st.caption("**Tip:** Paste multiple institutions at once \u2014 one per line. Format: `Label; Variant1, Variant2, ...`")
+st.caption("**Bulk entry:** Paste multiple institutions \u2014 one per line. Format: `Label; Variant1, Variant2, ...`")
+st.caption("If you only provide a label (no semicolon), variants will be auto-generated.")
 bulk_text = st.text_area(
     "Bulk entry (optional)",
-    placeholder="Utopia Medical Center; Utopia Medical Center, Utopia School of Medicine\nSpringfield General Hospital; Springfield General, Springfield Medical School",
+    placeholder="University of California, San Francisco\nYale University\nMayo Clinic; Mayo Clinic, Mayo Clinic Rochester, Mayo Foundation",
     height=100, key="bulk_input",
 )
 if st.button("\u2795 Add all from bulk entry"):
@@ -531,7 +753,7 @@ if st.button("\u2795 Add all from bulk entry"):
             variants = [v.strip() for v in parts[1].split(",") if v.strip()]
         else:
             label = line
-            variants = [line]
+            variants = generate_institution_variants(label)
         if label and variants:
             st.session_state.institutions.append({"label": label, "variants": variants})
             added += 1
@@ -545,14 +767,10 @@ if institutions:
     st.markdown("---")
     st.markdown(f'<div class="section-label">INSTITUTIONS TO ANALYZE \u2014 {len(institutions)} TOTAL</div>', unsafe_allow_html=True)
 
-    preview_data = []
     for i, inst in enumerate(institutions):
-        preview_data.append({
-            "#": i + 1,
-            "Label": inst["label"],
-            "Affiliation Variants": ", ".join(inst["variants"]),
-        })
-    st.dataframe(preview_data, use_container_width=True, hide_index=True)
+        with st.expander(f"**{inst['label']}** \u2014 {len(inst['variants'])} variants", expanded=False):
+            for v in inst["variants"]:
+                st.markdown(f"- {v}")
 
     col_clear, col_run = st.columns([1, 3])
     with col_clear:
@@ -570,11 +788,10 @@ if institutions:
 
     if run_clicked and email:
         st.markdown("---")
-
         all_results = []
 
         for inst_idx, inst in enumerate(institutions):
-            st.markdown(f'<div class="section-label">ANALYZING: {inst["label"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="section-label">ANALYZING: {inst["label"]} ({len(inst["variants"])} affiliation variants)</div>', unsafe_allow_html=True)
             progress_bar = st.progress(0)
             status_text = st.empty()
 
@@ -588,7 +805,6 @@ if institutions:
                 continue
 
             status_text.text(f"{inst['label']}: Done!")
-
             all_results.append({
                 "label": inst["label"],
                 "variants": inst["variants"],
@@ -599,7 +815,6 @@ if institutions:
             })
 
         if all_results:
-            # --- Results display ---
             st.markdown("---")
             st.markdown('<div class="main-header" style="font-size:1.6rem;">Results</div>', unsafe_allow_html=True)
             st.markdown(
@@ -607,7 +822,6 @@ if institutions:
                 unsafe_allow_html=True,
             )
 
-            # Comparison table if multiple institutions
             if len(all_results) > 1:
                 st.markdown('<div class="section-label">INSTITUTION COMPARISON</div>', unsafe_allow_html=True)
                 comparison = []
@@ -624,60 +838,8 @@ if institutions:
                 st.dataframe(comparison, use_container_width=True, hide_index=True)
                 st.markdown("")
 
-            # Per-institution details
-            for r in all_results:
-                st.markdown(f'### {r["label"]}')
-
-                # Stat cards
-                cm = r["combined"]
-                c1, c2, c3, c4, c5 = st.columns(5)
-                with c1:
-                    st.markdown(f'<div class="stat-card"><div class="stat-value">{cm["total_publications"]:,}</div><div class="stat-label">Publications</div></div>', unsafe_allow_html=True)
-                with c2:
-                    st.markdown(f'<div class="stat-card"><div class="stat-value">{cm["rcr_sum"]:,.1f}</div><div class="stat-label">RCR Sum</div></div>', unsafe_allow_html=True)
-                with c3:
-                    st.markdown(f'<div class="stat-card"><div class="stat-value">{cm["rcr_mean"]:.2f}</div><div class="stat-label">Mean RCR</div></div>', unsafe_allow_html=True)
-                with c4:
-                    st.markdown(f'<div class="stat-card"><div class="stat-value">{cm["rcr_median"]:.2f}</div><div class="stat-label">Median RCR</div></div>', unsafe_allow_html=True)
-                with c5:
-                    st.markdown(f'<div class="stat-card"><div class="stat-value">{cm["percentile_mean"]:.1f}</div><div class="stat-label">Mean Percentile</div></div>', unsafe_allow_html=True)
-
-                st.markdown("")
-
-                # Year breakdown table
-                st.markdown('<div class="section-label">YEAR-BY-YEAR BREAKDOWN</div>', unsafe_allow_html=True)
-                year_rows = []
-                for year in ANALYSIS_YEARS:
-                    ym = r["metrics_by_year"].get(year, {})
-                    year_rows.append({
-                        "Year": year,
-                        "Publications": ym.get("total_publications", 0),
-                        "With RCR": ym.get("pubs_with_rcr", 0),
-                        "RCR Sum": ym.get("rcr_sum", 0),
-                        "Mean RCR": ym.get("rcr_mean", 0),
-                        "Median RCR": ym.get("rcr_median", 0),
-                        "Mean Percentile": ym.get("percentile_mean", 0),
-                        "Provisional": ym.get("provisional_rcr_count", 0),
-                    })
-                # Add combined row
-                year_rows.append({
-                    "Year": "Combined",
-                    "Publications": cm["total_publications"],
-                    "With RCR": cm["pubs_with_rcr"],
-                    "RCR Sum": cm["rcr_sum"],
-                    "Mean RCR": cm["rcr_mean"],
-                    "Median RCR": cm["rcr_median"],
-                    "Mean Percentile": cm["percentile_mean"],
-                    "Provisional": cm["provisional_rcr_count"],
-                })
-                st.dataframe(year_rows, use_container_width=True, hide_index=True)
-
-                st.markdown("")
-
-            # --- Downloads ---
             st.markdown("---")
             st.markdown('<div class="section-label">DOWNLOADS</div>', unsafe_allow_html=True)
-
             cols = st.columns(min(len(all_results), 3))
             for i, r in enumerate(all_results):
                 with cols[i % 3]:
